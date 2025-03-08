@@ -1,0 +1,85 @@
+Changing password and keys
+Change all user passwords
+Change keys on the system
+Only ones should be the ones that you set up and the scoring engine keys
+Scoring key should say scoring key don’t remove
+Back up scoring keys
+In the authorized keys file, there should only be the scoring engine key, anything else is a redteam key
+Don’t use default keys as blueteam, make your own
+Close reverse shell
+sudo lsof -i - or use netstat
+Bind shells are easy to track because they’re constantly running
+Reverse shells are only easy to detect if they’re actively being used
+ps aux PID - see what’s going on
+Look through the command and see where it’s being run from
+Emacs
+Wordle
+PAM
+Usually where password loggers are
+Look at the files and see if they were edited recently
+ls -l or ll
+Things that are usually messed with
+passwordauth
+systemauth
+Make sure no weird scripts are running
+System users
+
+Remove unneeded users
+Reduce unneeded services
+Change passwords/keys
+
+Lock the root user
+Should be either a !! or * in between the first two colons
+Should NOT be nothing, that means no password
+If there's also a bin bash shell for the user, take away the shell and set a password
+Do it from the command line
+If you’re unsure, lock the account rather than deleting the user
+sudo passwd -l account
+Locking the account means you can’t switch to be that user
+
+Check the shadow and passwd files
+
+Delete all obvious redteam users, then go through system users
+THEN change passwords 
+
+
+alias and unalias
+Which command to find which binary the command is using
+The binaries can be moved and renamed, even though they might keep the binary
+Debsums
+Run a command to check all the bin files
+rpm -Va
+
+Aliases
+You can switch your shell to get rid of bash aliases
+Just type in sh
+Aliases are related to the shell you’re in
+Different users can have different alias
+/etc/bashrc
+/home/user/.bashrc holds your aliases
+Delete malicious lines
+Source the file
+source ~/.bashrc
+Reloads the service but for bash
+
+
+Shells are usually bash sh zsh
+
+Bashrc runs when you log in
+
+Look at what runs when you log in
+Message of the day
+
+Most system processes are not a bash script
+
+rsyslog is the logger. Make sure its on and active
+sudo systemctl restart rsyslog.service
+
+ps aux | grep bash
+
+Check the groups file to see what users are in which groups
+blackteam and blueteam should be in wheel and that’s pretty much it
+sudo visudo - if there are ANY syntax errors, everything will break
+Sudo should have access to all
+Wheel should have access to all but should require a password
+Leave blackteam alone…
