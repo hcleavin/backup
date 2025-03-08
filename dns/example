@@ -1,0 +1,38 @@
+@ 	IN	SOA	ns1.team17.net. admin.team17.net. (
+)
+@ 	IN	NS	ns1.team17.net.
+
+www	IN	A	192.168.17.5
+db	IN	A	192.168.17.7
+ns1	IN	A	192.168.17.12
+	
+
+
+@ 	IN	SOA	ns1.team17.net. admin.team17.net. (
+)
+@ 	IN	NS	ns1.team17.net.
+
+12	IN	PTR	ns1.team17.net.
+5	IN	PTR	www.team17.net.
+7	IN	PTR	db.team17.net.
+
+
+
+@ 	IN	SOA	ns1.team17.ncaecybergames.org. admin.team17.ncaecybergames.org. (
+)
+@ 	IN	NS	ns1.team17.ncaecybergames.org.
+
+ns1	IN	A	172.18.13.17
+www	IN	A	172.18.13.17
+shell	IN	A	172.18.14.17
+files	IN	A	172.18.14.17
+
+
+@ 	IN	SOA	ns1.team17.ncaecybergames.org. admin.team17.ncaecybergames.org.(
+)
+@ 	IN	NS	ns1.team17.ncaecybergames.org.
+
+17.13 	IN	PTR	ns1.team17.ncaecybergames.org.
+17.13	IN	PTR	www.team17.ncaecybergames.org.
+17.14	IN	PTR	shell.team17.ncaecybergames.org.
+17.14	IN	PTR 	files.team17.ncaecybergames.org.
