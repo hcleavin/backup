@@ -1,0 +1,135 @@
+Getting DNS to work:
+Zone files must be valid and correct
+named-checkzone zonename filename
+named-checkconf -z - checks named.conf and test loads all master zones
+Zone files must be listed in the appropriate file
+Depends on what file. Just make sure the file path is correct
+Permissions
+root bind 644 - configuration files
+root root 644 - db.files
+root bind drwxr-s-r-x - zones directory
+For external, port forwarding on the router to the DNS server
+Check Noah’s github
+
+https://kb.isc.org/docs/bind-best-practices-authoritative
+
+
+Hardening:
+Update everything
+Named.conf file
+Options 
+Enable DNSSEC
+ACL
+Disable zone transfers
+Rate limiting
+Disable recursion
+version "DNSDNSDNSDNSDNSDNSDNSDNSDNSDNSDNSDNS";
+Logging
+print-time yes;
+print-category yes;
+print-severity yes;
+Backups
+
+Troubleshooting
+Check connection with other devices on the network
+dig 
+dig [server] [name] [type]
+dig google.com +noall +answer
+dig -x 142.250.180.206 -- reverse
+
+
+
+
+
+
+
+
+
+Starting up
+Where are files usually located?
+find / -type t -name ‘named.conf’
+The directory with all the files will be listed in the options block
+What ports must be open/allowed?
+Daemons?
+The named daemon is the only daemon required for basic functionality
+IP addresses listening? - all or just one?
+
+To work:
+What is the minimum requirement for it to work?
+What files are required for it to be up?
+What formatting does work?
+What permissions are required?
+What ownership is required?
+What formatting doesn’t work?/What makes it not work?
+
+Hardening:
+What options make it more secure?
+What ways can an attacker stop it from working?
+What parts of the server are vulnerable?
+
+Troubleshooting:
+What should be listening?/What is listening?
+What ports should be open?/What ports are open?
+What parts of the server might be targeted?
+
+
+Daemons for bind
+Named
+Rsyslog
+Syslog-ng
+
+
+@ IN NS nameofauthoritativenameserver
+Reverse lookup zone files are sensitive to the final dot
+Check if resolv.conf file has your computer set as its nameserver
+You can make files immutable…
+Recursion should be no, this is an authoritative nameserver
+Run bind as an unprivileged user
+Response rate limiting
+
+Conditions to monitor include:
+process presence
+CPU utilization
+memory usage
+network throughput and buffering (inbound/outbound)
+filesystem utilization (on the log filesystem and also the filesystem containing the named working directory)
+Logs should be examined periodically for error and warning messages which may provide a tip-off for incipient problems before they become critical.
+
+
+
+passwd
+named:x:25:25:Named:/var/named:/sbin/nologin
+
+shadow
+named:!!:number:::::
+
+group
+named:x:25:
+Wheel:x:10:blackteam,blueteam
+
+https://docs.oracle.com/cd/E19683-01/806-4077/6jd6blbc0/index.html
+
+
+
+options {
+recursion no;
+allow-transfer { none; };
+allow-query { internal; external; };
+allow-recursion { internal; };
+forwarders { 8.8.8.8; };
+listen-on { internalip; externalip; }; - should not be the loopback address - should be the actual ip 
+};
+
+
+acl “internal” { 
+192.168.0.0/16; - first two octets locked in
+};
+
+acl “external” {
+	172.18.0.0/16 - first two octets locked in
+
+zone “example.com” {
+	type master;
+	file “/etc/bind/zones/db.example.com”;
+	allow-query { 172.18.0.0/16; }; -- limits queries to int/ext devices for this zone - useful?
+};
