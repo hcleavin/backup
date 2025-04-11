@@ -14,7 +14,6 @@ startup() {
 check_permissions() {
     if [[ "$EUID" -ne 0 ]]; then
         echo "This script must be run as root (use sudo)"
-        log_error "Script must be run as root (use sudo)"
         exit 1
     fi
 }
