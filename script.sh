@@ -235,7 +235,7 @@ make_record() {
 
     if [[ "$record_type" == "PTR" ]]; then
         while true; do
-            echo "Please enter the IP octet"
+            echo "Please enter the IP octet to complete this IP address: ${zone_file#"db."}"
             read ip_rev
             if [[ "$ip_rev" =~ ^[0-9]{1,3}$ ]] && (( ip_rev >= 0 && ip_rev <= 255 )); then
                 break
@@ -243,7 +243,7 @@ make_record() {
                 echo "Invalid octet. Must be a number between 0 and 255."
             fi
         done
-        echo "Please enter the domain"
+        echo "Please enter the subdomain for ${zone_file#"db."}."
         read domain_rev
         echo "$ip_rev\tIN\t$record_type\t$domain_rev" >> "$zone_file"
     else
