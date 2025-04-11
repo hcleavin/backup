@@ -113,7 +113,7 @@ config_setup() {
 create_zone_file() {
     mkdir -p "/etc/bind/zones/"
     chown root:bind "/etc/bind/zones"
-    if [! -f /etc/bind/named.conf.script_zones ]; then
+    if [ ! -f /etc/bind/named.conf.script_zones ]; then
         touch "/etc/bind/named.conf.script_zones"
     fi
 
@@ -266,8 +266,7 @@ record_zones_menu() {
         echo "Please choose an option:"
         echo "1. Create zone files"
         echo "2. Create records"
-        echo "3. Test configurations/zone files"
-        echo "4. Save and quit" 
+        echo "3. Save and quit"
         echo "Enter your choice (pick a number): " 
         read choice
 
