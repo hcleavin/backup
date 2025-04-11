@@ -39,6 +39,7 @@ start_bind() {
 }
 
 config_setup() {
+    install_bind
     if [ ! -d /etc/bind/ ]; then
         echo "/etc/bind directory not found. Exiting."
         log_error "/etc/bind directory not found"
@@ -61,6 +62,12 @@ config_setup() {
     fi
 
     sed -i '/^include "\/etc\/bind\/named.conf.options";$/d' "/etc/bind/named.conf"
+
+    if [ -f /etc/bind/named.conf.script_conf]; then
+        echo "Default configurations are already set! Try creating zone files/records instead!"
+        log_error "Default configs already set"
+        exit 1
+    fi
 
     echo "Enter the internal IP/subnet for the 'internal' access control list (Ex. 192.168.0.0/24)"
     while true; do
@@ -94,20 +101,24 @@ config_setup() {
 
     echo -e "acl \"external\" {\n$external_acl_and_subnet;\n};" >> "/etc/bind/named.conf.script_conf"
 
-    echo -e "options {\nallow-transfer { none; };\nallow-recursion { none; };\nallow-query { internal; external; };\nlisten-on { $internal_ip; $external_ip; };\n};" >> "/etc/bind/named.conf.script_conf"
+    echo "" >> "/etc/bind/named.conf.script_conf"
 
-    echo -e "logging {\nchannel query_log {\nfile \"/var/log/named_query.log\" versions 10 size 5m;\nseverity info;\nprint-time yes;\nprint-severity yes;\nprint-category yes;\n};\nchannel default_log {\nfile \"/var/log/named.log\" versions 10 size 5m;\nseverity warning;\nprint-time yes;\nprint-severity yes;\nprint-category yes;\n};\ncategory queries { query_log; };\ncategory default { default_log; };\n};" >> "/etc/bind/named.conf.script_conf"
+    echo -e "options {\n\tdirectory \"/var/cache/bind\";\n\tallow-transfer { none; };\n\tallow-recursion { none; };\n\tallow-query { internal; external; };\n\tlisten-on { $internal_ip; $external_ip; };\n};" >> "/etc/bind/named.conf.script_conf"
+
+    echo -e "logging {\n\tchannel query_log {\n\t\tfile \"/var/log/named_query.log\" versions 10 size 5m;\n\t\tseverity info;\n\t\tprint-time yes;\n\t\tprint-severity yes;\n\t\tprint-category yes;\n\t};\n\n\tchannel default_log {\n\t\tfile \"/var/log/named.log\" versions 10 size 5m;\n\t\tseverity warning;\n\t\tprint-time yes;\n\t\tprint-severity yes;\n\t\tprint-category yes;\n\t\t};\n\tcategory queries { query_log; };\n\tcategory default { default_log; };\n};" >> "/etc/bind/named.conf.script_conf"
     
     chown root:bind "/etc/bind/named.conf.script_conf"
     chmod 644 "/etc/bind/named.conf.script_conf"
-    echo "Set default configurations!"
+    echo "Default configurations are set!"
 }
 
 create_zone_file() {
     mkdir -p "/etc/bind/zones/"
     chown root:bind "/etc/bind/zones"
+    if [! -f /etc/bind/named.conf.script_zones ]; then
+        touch "/etc/bind/named.conf.script_zones"
+    fi
 
-    touch "/etc/bind/named.conf.script_zones"
     grep -q 'include "named.conf.script_zones;"' "/etc/bind/named.conf" || echo "include \"/etc/bind/named.conf.script_zones\";" >> "/etc/bind/named.conf"
 
     while true; do
@@ -128,45 +139,76 @@ create_zone_file() {
         read domain
         cp "/etc/bind/db.empty" "/etc/bind/zones/db.$domain"
         sed -i "s/localhost./ns.$domain./g" "/etc/bind/zones/db.$domain"
-        sed -i "s/root./admin./g" "/etc/bind/zones/db.$domain"
+        sed -i "s/root.ns./admin./g" "/etc/bind/zones/db.$domain"
         echo -e "zone \"$domain\" {\ntype master;\nfile \"/etc/bind/zones/db.$domain\";\nallow-query { $internal_external; };\n};" >> "/etc/bind/named.conf.script_zones"
         chown root:bind "/etc/bind/zones/db.$domain"
         chmod 644 "/etc/bind/zones/db.$domain"
+        echo "Created zone file \"/etc/bind/zones/db.$domain\""
+        echo "You must enter a forward record for the nameserver for this zone file!"
+        while true; do
+            echo "Please enter a valid IP for this record: ns.$domain."
+            read ip_fwd
+            validate_ip "$ip_fwd" && break
+        done
+
+        echo -e "$domain_fwd\tIN\tA\t$ip_fwd" >> "/etc/bind/zones/db.$domain"
     fi
 
     if [[ "$forward_or_reverse" == "reverse" ]]; then
         echo "Please enter the IP you'd like to make a zone for (ONE OCTET AT A TIME, first three octets)"
         
-        echo "First octet"
-        read octet1
-        if [[ "$octet1" =~ ^[0-9]{1,3}$ ]] && (( octet1 >= 0 && octet1 <= 255 )); then
-            break
-        else
-            echo "Invalid octet. Must be a number between 0 and 255. Try again."
-        fi
+        while true; do
+            echo "First octet"
+            read octet1
+            if [[ "$octet1" =~ ^[0-9]{1,3}$ ]] && (( octet1 >= 0 && octet1 <= 255 )); then
+                break
+            else
+                echo "Invalid octet. Must be a number between 0 and 255. Try again."
+            fi
+        done
 
-        echo "Second octet"
-        read octet2
-        if [[ "$octet2" =~ ^[0-9]{1,3}$ ]] && (( octet2 >= 0 && octet2 <= 255 )); then
-            break
-        else
-            echo "Invalid octet. Must be a number between 0 and 255."
-        fi
+        while true; do
+            echo "Second octet"
+            read octet2
+            if [[ "$octet2" =~ ^[0-9]{1,3}$ ]] && (( octet2 >= 0 && octet2 <= 255 )); then
+                break
+            else
+                echo "Invalid octet. Must be a number between 0 and 255."
+            fi
+        done
 
-        echo "Third octet"
-        read octet3
-        if [[ "$octet3" =~ ^[0-9]{1,3}$ ]] && (( octet3 >= 0 && octet3 <= 255 )); then
-            break
-        else
-            echo "Invalid octet. Must be a number between 0 and 255."
-        fi
+        
+        while true; do 
+            echo "Third octet"
+            read octet3
+            if [[ "$octet3" =~ ^[0-9]{1,3}$ ]] && (( octet3 >= 0 && octet3 <= 255 )); then
+                break
+            else
+                echo "Invalid octet. Must be a number between 0 and 255."
+            fi
+        done
 
         cp /etc/bind/db.empty /etc/bind/zones/db.$octet1.$octet2.$octet3
         echo -e "zone \"$octet3.$octet2.$octet1.in-addr.arpa\" {\ntype master;\nfile \"/etc/bind/zones/db.$octet1.$octet2.$octet3\";\nallow-query { $internal_external; };\n};" >> "/etc/bind/named.conf.script_zones"
         chown root:bind "/etc/bind/zones/db.$octet1.$octet2.$octet3"
         chmod 644 "/etc/bind/zones/db.$octet1.$octet2.$octet3"
+        echo "Created zone file \"/etc/bind/zones/db.$octet1.$octet2.$octet3\""
+
+        echo "You must enter a record for the nameserver for this zone file!"
+        while true; do
+            echo "Please enter the IP octet for the PTR record (This is the final octet in the IP that points to the nameserver)"
+            read ip_rev
+            if [[ "$ip_rev" =~ ^[0-9]{1,3}$ ]] && (( ip_rev >= 0 && ip_rev <= 255 )); then
+                break
+            else
+                echo "Invalid octet. Must be a number between 0 and 255."
+            fi
+        done
+        echo "Please enter the domain for the nameserver that will contain reverse records for this zone file (should be in the format of ns.rest_of_domain) (DO NOT ADD THE DOT AT THE END IT'S ADDED AUTOMATICALLY)"
+        read domain_rev
+        echo "$ip_rev\tIN\tPTR\t$domain_rev." >> "/etc/bind/zones/db.$octet1.$octet2.$octet3"
     fi
-    main_menu
+    record_zones_menu
 }
 
 make_record() {
@@ -181,13 +223,17 @@ make_record() {
         echo "$file"
     done
 
-    echo "Please enter the zone file you'd like to add to (respond with the full path!)"
-    read zone_file
-
-    if [ ! -f "$zone_file" ]; then
-        echo "Zone file does not exist"
-        return 1
-    fi
+    while true; do
+        echo "Please enter the zone file you'd like to add to (respond with the full path!)"
+        read zone_file
+        if [ ! -f "$zone_file" ]; then
+            echo "Zone file does not exist"
+        fi
+        if [ -f "$zone_file" ]; then
+            echo "Valid zone file!"
+            break
+        fi
+    done
 
     if [[ "$record_type" == "PTR" ]]; then
         while true; do
@@ -214,10 +260,10 @@ make_record() {
 
         echo -e "$domain_fwd\tIN\t$record_type\t$ip_fwd" >> "$zone_file"
     fi
-    main_menu
+    record_zones_menu
 }
 
-main_menu() {
+record_zones_menu() {
     while true; do
         echo "Please choose an option:"
         echo "1. Create zone files"
@@ -238,6 +284,37 @@ main_menu() {
                 ;;
             1) 
                 create_zone_file
+                break
+                ;;
+            *)
+                log_error "Invalid menu choice: $choice"
+                echo "Please enter a valid choice"
+                ;;
+        esac
+    done
+}
+
+main_menu() {
+    while true; do
+        echo "Please choose an option:"
+        echo "1. Set default configurations"
+        echo "2. Create zone files or records"
+        echo "3. Save and quit" 
+        echo "Enter your choice (pick a number): " 
+        read choice
+
+        case $choice in
+            3) 
+                echo "Checking configuration/zone files!"
+                test_conf_zones
+                break
+                ;;
+            2) 
+                record_zones_menu
+                break
+                ;;
+            1) 
+                config_setup
                 break
                 ;;
             *)
@@ -319,6 +396,4 @@ log_error() {
 
 check_permissions
 startup
-install_bind
-config_setup
 main_menu
