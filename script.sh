@@ -33,9 +33,7 @@ install_bind() {
 
 start_bind() {
     systemctl enable named
-
-    systemctl start named
-
+    systemctl restart named
 }
 
 config_setup() {
@@ -268,7 +266,8 @@ record_zones_menu() {
         echo "Please choose an option:"
         echo "1. Create zone files"
         echo "2. Create records"
-        echo "3. Save and quit" 
+        echo "3. Test configurations/zone files"
+        echo "4. Save and quit" 
         echo "Enter your choice (pick a number): " 
         read choice
 
@@ -392,7 +391,6 @@ validate_ip_with_subnet() {
 log_error() {
     echo "$(date) ERROR: $1" >> "/var/log/dns-setup-errors.log"
 }
-
 
 check_permissions
 startup
