@@ -44,19 +44,25 @@ config_setup() {
         exit 1
     fi
 
-    if [ ! -f "/var/log/dns-setup-errors.log" ]; then
-        touch "/var/log/dns-setup-errors.log"
-        chmod 644 "/var/log/dns-setup-errors.log"
+    sudo mkdir "/etc/bind/log/"
+    sudo chown bind:bind "/etc/bind/log"
+    sudo chmod 644 "/etc/bind/log/"
+
+    if [ ! -f "/etc/bind/log/dns-setup-errors.log" ]; then
+        touch "/etc/bind/log/dns-setup-errors.log"
+        chmod 644 "/etc/bind/log/dns-setup-errors.log"
     fi
 
-    if [ ! -f "/var/log/named_query.log" ]; then
-        touch "/var/log/named_query.log"
-        chmod 644 "/var/log/named_query.log"
+    if [ ! -f "/etc/bind/log/named_query.log" ]; then
+        touch "/etc/bind/log/named_query.log"
+        chmod 644 "/etc/bind/log/named_query.log"
+        chown bind:bind "/etc/bind/log/named_query.log"
     fi
 
-    if [ ! -f "/var/log/named.log" ]; then
-        touch "/var/log/named.log"
-        chmod 644 "/var/log/named.log"
+    if [ ! -f "/etc/bind/log/named.log" ]; then
+        touch "/etc/bind/log/named.log"
+        chmod 644 "/etc/bind/log/named.log"
+        chown bind:bind "/etc/bind/log/named.log"
     fi
 
     sed -i '/^include "\/etc\/bind\/named.conf.options";$/d' "/etc/bind/named.conf"
@@ -103,7 +109,7 @@ config_setup() {
 
     echo -e "options {\n\tdirectory \"/var/cache/bind\";\n\tallow-transfer { none; };\n\tallow-recursion { none; };\n\tallow-query { internal; external; };\n\tlisten-on { $internal_ip; $external_ip; };\n};" >> "/etc/bind/named.conf.script_conf"
 
-    echo -e "logging {\n\tchannel query_log {\n\t\tfile \"/var/log/named_query.log\" versions 10 size 5m;\n\t\tseverity info;\n\t\tprint-time yes;\n\t\tprint-severity yes;\n\t\tprint-category yes;\n\t};\n\n\tchannel default_log {\n\t\tfile \"/var/log/named.log\" versions 10 size 5m;\n\t\tseverity warning;\n\t\tprint-time yes;\n\t\tprint-severity yes;\n\t\tprint-category yes;\n\t\t};\n\tcategory queries { query_log; };\n\tcategory default { default_log; };\n};" >> "/etc/bind/named.conf.script_conf"
+    echo -e "logging {\n\tchannel query_log {\n\t\tfile \"/etc/bind/log/named_query.log\" versions 10 size 5m;\n\t\tseverity info;\n\t\tprint-time yes;\n\t\tprint-severity yes;\n\t\tprint-category yes;\n\t};\n\n\tchannel default_log {\n\t\tfile \"/etc/bind/log/named.log\" versions 10 size 5m;\n\t\tseverity warning;\n\t\tprint-time yes;\n\t\tprint-severity yes;\n\t\tprint-category yes;\n\t\t};\n\tcategory queries { query_log; };\n\tcategory default { default_log; };\n};" >> "/etc/bind/named.conf.script_conf"
     
     chown root:bind "/etc/bind/named.conf.script_conf"
     chmod 644 "/etc/bind/named.conf.script_conf"
@@ -117,7 +123,7 @@ create_zone_file() {
         touch "/etc/bind/named.conf.script_zones"
     fi
 
-    grep -q 'include "named.conf.script_zones;"' "/etc/bind/named.conf" || echo "include \"/etc/bind/named.conf.script_zones\";" >> "/etc/bind/named.conf"
+    grep -q 'include "/etc/bind/named.conf.script_zones";' "/etc/bind/named.conf" || echo "include \"/etc/bind/named.conf.script_zones\";" >> "/etc/bind/named.conf"
 
     while true; do
         echo "Will the records in this zone file be internally or externally available? (respond 'internal' or 'external')"
@@ -149,7 +155,7 @@ create_zone_file() {
             validate_ip "$ip_fwd" && break
         done
 
-        echo -e "$domain_fwd\tIN\tA\t$ip_fwd" >> "/etc/bind/zones/db.$domain"
+        echo -e "ns\tIN\tA\t$ip_fwd" >> "/etc/bind/zones/db.$domain"
     fi
 
     if [[ "$forward_or_reverse" == "reverse" ]]; then
@@ -388,7 +394,7 @@ validate_ip_with_subnet() {
 }
 
 log_error() {
-    echo "$(date) ERROR: $1" >> "/var/log/dns-setup-errors.log"
+    echo "$(date) ERROR: $1" >> "/etc/bind/log/dns-setup-errors.log"
 }
 
 check_permissions
