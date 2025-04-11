@@ -53,18 +53,6 @@ config_setup() {
         chmod 644 "/etc/bind/log/dns-setup-errors.log"
     fi
 
-    if [ ! -f "/etc/bind/log/named_query.log" ]; then
-        touch "/etc/bind/log/named_query.log"
-        chmod 644 "/etc/bind/log/named_query.log"
-        chown bind:bind "/etc/bind/log/named_query.log"
-    fi
-
-    if [ ! -f "/etc/bind/log/named.log" ]; then
-        touch "/etc/bind/log/named.log"
-        chmod 644 "/etc/bind/log/named.log"
-        chown bind:bind "/etc/bind/log/named.log"
-    fi
-
     sed -i '/^include "\/etc\/bind\/named.conf.options";$/d' "/etc/bind/named.conf"
 
     if [ -f /etc/bind/named.conf.script_conf ]; then
@@ -101,15 +89,9 @@ config_setup() {
 
     grep -q 'include "/etc/bind/named.conf.script_conf";' "/etc/bind/named.conf" || echo "include \"/etc/bind/named.conf.script_conf\";" >> "/etc/bind/named.conf"
 
-    echo -e "acl \"internal\" {\n$internal_acl_and_subnet;\n};" >> "/etc/bind/named.conf.script_conf"
-
-    echo -e "acl \"external\" {\n$external_acl_and_subnet;\n};" >> "/etc/bind/named.conf.script_conf"
-
     echo "" >> "/etc/bind/named.conf.script_conf"
 
-    echo -e "options {\n\tdirectory \"/var/cache/bind\";\n\tallow-transfer { none; };\n\tallow-recursion { none; };\n\tallow-query { internal; external; };\n\tlisten-on { $internal_ip; $external_ip; };\n};" >> "/etc/bind/named.conf.script_conf"
-
-    echo -e "logging {\n\tchannel query_log {\n\t\tfile \"/etc/bind/log/named_query.log\" versions 10 size 5m;\n\t\tseverity info;\n\t\tprint-time yes;\n\t\tprint-severity yes;\n\t\tprint-category yes;\n\t};\n\n\tchannel default_log {\n\t\tfile \"/etc/bind/log/named.log\" versions 10 size 5m;\n\t\tseverity warning;\n\t\tprint-time yes;\n\t\tprint-severity yes;\n\t\tprint-category yes;\n\t\t};\n\tcategory queries { query_log; };\n\tcategory default { default_log; };\n};" >> "/etc/bind/named.conf.script_conf"
+    echo -e "options {\n\tdirectory \"/var/cache/bind\";\n\tallow-transfer { none; };\n\tallow-recursion { none; };\n\tallow-query { any; };\n\tlisten-on { $internal_ip; $external_ip; };\n};" >> "/etc/bind/named.conf.script_conf"
     
     chown root:bind "/etc/bind/named.conf.script_conf"
     chmod 644 "/etc/bind/named.conf.script_conf"
@@ -144,7 +126,7 @@ create_zone_file() {
         cp "/etc/bind/db.empty" "/etc/bind/zones/db.$domain"
         sed -i "s/localhost./ns.$domain./g" "/etc/bind/zones/db.$domain"
         sed -i "s/root.ns./admin./g" "/etc/bind/zones/db.$domain"
-        echo -e "zone \"$domain\" {\ntype master;\nfile \"/etc/bind/zones/db.$domain\";\nallow-query { $internal_external; };\n};" >> "/etc/bind/named.conf.script_zones"
+        echo -e "zone \"$domain\" {\ntype master;\nfile \"/etc/bind/zones/db.$domain\";\n};" >> "/etc/bind/named.conf.script_zones"
         chown root:bind "/etc/bind/zones/db.$domain"
         chmod 644 "/etc/bind/zones/db.$domain"
         echo "Created zone file \"/etc/bind/zones/db.$domain\""
@@ -193,7 +175,7 @@ create_zone_file() {
         done
 
         cp /etc/bind/db.empty /etc/bind/zones/db.$octet1.$octet2.$octet3
-        echo -e "zone \"$octet3.$octet2.$octet1.in-addr.arpa\" {\ntype master;\nfile \"/etc/bind/zones/db.$octet1.$octet2.$octet3\";\nallow-query { $internal_external; };\n};" >> "/etc/bind/named.conf.script_zones"
+        echo -e "zone \"$octet3.$octet2.$octet1.in-addr.arpa\" {\ntype master;\nfile \"/etc/bind/zones/db.$octet1.$octet2.$octet3\";\n};" >> "/etc/bind/named.conf.script_zones"
         chown root:bind "/etc/bind/zones/db.$octet1.$octet2.$octet3"
         chmod 644 "/etc/bind/zones/db.$octet1.$octet2.$octet3"
         echo "Created zone file \"/etc/bind/zones/db.$octet1.$octet2.$octet3\""
