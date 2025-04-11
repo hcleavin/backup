@@ -61,7 +61,7 @@ config_setup() {
 
     sed -i '/^include "\/etc\/bind\/named.conf.options";$/d' "/etc/bind/named.conf"
 
-    if [ -f /etc/bind/named.conf.script_conf]; then
+    if [ -f /etc/bind/named.conf.script_conf ]; then
         echo "Default configurations are already set! Try creating zone files/records instead!"
         log_error "Default configs already set"
         exit 1
