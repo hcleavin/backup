@@ -11,6 +11,14 @@ startup() {
 ######  #     #  #####"                                  
 }
 
+check_permissions() {
+    if [[ "$EUID" -ne 0 ]]; then
+        echo "This script must be run as root (use sudo)"
+        log_error "Script must be run as root (use sudo)"
+        exit 1
+    fi
+}
+
 install_bind() {
     if ! command -v named &> /dev/null; then
         apt install bind9 bind9utils bind9-doc -y
@@ -53,13 +61,15 @@ config_setup() {
         chmod 644 "/var/log/named.log"
     fi
 
-    echo "Enter the internal IP/subnet (Ex. 192.168.1.1/24)"
+    sed -i '/^include "\/etc\/bind\/named.conf.options";$/d' "/etc/bind/named.conf"
+
+    echo "Enter the internal IP/subnet for the 'internal' access control list (Ex. 192.168.0.0/24)"
     while true; do
         read internal_acl_and_subnet
         validate_ip_with_subnet "$internal_acl_and_subnet" && break
     done
 
-    echo "Enter the external IP/subnet (Ex. 192.168.1.1/24)"
+    echo "Enter the external IP/subnet for the 'external' access control list (Ex. 172.18.0.0/24)"
     while true; do
         read external_acl_and_subnet
         validate_ip_with_subnet "$external_acl_and_subnet" && break
@@ -81,16 +91,17 @@ config_setup() {
 
     grep -q 'include "/etc/bind/named.conf.script_conf";' "/etc/bind/named.conf" || echo "include \"/etc/bind/named.conf.script_conf\";" >> "/etc/bind/named.conf"
 
-    echo -e "acl \"internal\" {\n$internal_acl_and_subnet\n};" >> "/etc/bind/named.conf.script_conf"
+    echo -e "acl \"internal\" {\n$internal_acl_and_subnet;\n};" >> "/etc/bind/named.conf.script_conf"
 
-    echo -e "acl \"external\" {\n$external_acl_and_subnet\n};" >> "/etc/bind/named.conf.script_conf"
+    echo -e "acl \"external\" {\n$external_acl_and_subnet;\n};" >> "/etc/bind/named.conf.script_conf"
 
-    echo -e "options {\nallow-transfer { none; };\nallow-recursion { no; };\nallow-query { internal; external; };\nlisten-on { $internal_ip; $external_ip; };\n};" >> "/etc/bind/named.conf.script_conf"
+    echo -e "options {\nallow-transfer { none; };\nallow-recursion { none; };\nallow-query { internal; external; };\nlisten-on { $internal_ip; $external_ip; };\n};" >> "/etc/bind/named.conf.script_conf"
 
     echo -e "logging {\nchannel query_log {\nfile \"/var/log/named_query.log\" versions 10 size 5m;\nseverity info;\nprint-time yes;\nprint-severity yes;\nprint-category yes;\n};\nchannel default_log {\nfile \"/var/log/named.log\" versions 10 size 5m;\nseverity warning;\nprint-time yes;\nprint-severity yes;\nprint-category yes;\n};\ncategory queries { query_log; };\ncategory default { default_log; };\n};" >> "/etc/bind/named.conf.script_conf"
     
     chown root:bind "/etc/bind/named.conf.script_conf"
     chmod 644 "/etc/bind/named.conf.script_conf"
+    echo "Set default configurations!"
 }
 
 create_zone_file() {
@@ -101,7 +112,7 @@ create_zone_file() {
     grep -q 'include "named.conf.script_zones;"' "/etc/bind/named.conf" || echo "include \"/etc/bind/named.conf.script_zones\";" >> "/etc/bind/named.conf"
 
     while true; do
-        echo "Is this record internally or externally available? (internal/external)"
+        echo "Will the records in this zone file be internally or externally available? (respond 'internal' or 'external')"
         read internal_external
         if [[ "$internal_external" == "internal" || "$internal_external" == "external" ]]; then
             break
@@ -110,11 +121,11 @@ create_zone_file() {
         fi
     done
 
-    echo "Forward or reverse zone?"
+    echo "Will this zone file be for forward or reverse lookups? (respond 'forward' or 'reverse') "
     read forward_or_reverse
 
     if [[ "$forward_or_reverse" == "forward" ]]; then
-        echo "Please enter the domain you'd like to make forward records for"
+        echo "Please enter the domain you'd like to make a zone for"
         read domain
         cp "/etc/bind/db.empty" "/etc/bind/zones/db.$domain"
         sed -i "s/localhost./ns.$domain./g" "/etc/bind/zones/db.$domain"
@@ -125,14 +136,31 @@ create_zone_file() {
     fi
 
     if [[ "$forward_or_reverse" == "reverse" ]]; then
-        echo "Please enter the IP you'd like to make reverse records for (ONE OCTET AT A TIME, first three octets)"
-        while true; do
-            read octet1
-            read octet2
-            read octet3
-            reverse_ip="$octet1.$octet2.$octet3"
-            validate_ip "$reverse_ip" && break
-        done
+        echo "Please enter the IP you'd like to make a zone for (ONE OCTET AT A TIME, first three octets)"
+        
+        echo "First octet"
+        read octet1
+        if [[ "$octet1" =~ ^[0-9]{1,3}$ ]] && (( octet1 >= 0 && octet1 <= 255 )); then
+            break
+        else
+            echo "Invalid octet. Must be a number between 0 and 255. Try again."
+        fi
+
+        echo "Second octet"
+        read octet2
+        if [[ "$octet2" =~ ^[0-9]{1,3}$ ]] && (( octet2 >= 0 && octet2 <= 255 )); then
+            break
+        else
+            echo "Invalid octet. Must be a number between 0 and 255."
+        fi
+
+        echo "Third octet"
+        read octet3
+        if [[ "$octet3" =~ ^[0-9]{1,3}$ ]] && (( octet3 >= 0 && octet3 <= 255 )); then
+            break
+        else
+            echo "Invalid octet. Must be a number between 0 and 255."
+        fi
 
         cp /etc/bind/db.empty /etc/bind/zones/db.$octet1.$octet2.$octet3
         echo -e "zone \"$octet3.$octet2.$octet1.in-addr.arpa\" {\ntype master;\nfile \"/etc/bind/zones/db.$octet1.$octet2.$octet3\";\nallow-query { $internal_external; };\n};" >> "/etc/bind/named.conf.script_zones"
@@ -143,7 +171,7 @@ create_zone_file() {
 }
 
 make_record() {
-    echo "What record type would you like to create?"
+    echo "What record type would you like to create? (available types are PTR, A, or CNAME)"
     read record_type
     if [[ "$record_type" != "PTR" && "$record_type" != "A" && "$record_type" != "CNAME" ]]; then
         echo "Invalid record type. Supported types: PTR, A, CNAME."
@@ -154,7 +182,7 @@ make_record() {
         echo "$file"
     done
 
-    echo "Please enter the zone file you'd like to add to"
+    echo "Please enter the zone file you'd like to add to (respond with the full path!)"
     read zone_file
 
     if [ ! -f "$zone_file" ]; then
@@ -290,6 +318,7 @@ log_error() {
 }
 
 
+check_permissions
 startup
 install_bind
 config_setup
