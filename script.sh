@@ -61,37 +61,13 @@ config_setup() {
         exit 1
     fi
 
-    echo "Enter the internal IP/subnet for the 'internal' access control list (Ex. 192.168.0.0/24)"
-    while true; do
-        read internal_acl_and_subnet
-        validate_ip_with_subnet "$internal_acl_and_subnet" && break
-    done
-
-    echo "Enter the external IP/subnet for the 'external' access control list (Ex. 172.18.0.0/24)"
-    while true; do
-        read external_acl_and_subnet
-        validate_ip_with_subnet "$external_acl_and_subnet" && break
-    done
-
-    while true; do
-        echo "Enter this machine's internal IP"
-        read internal_ip
-        validate_ip "$internal_ip" && break
-    done
-
-    while true; do
-        echo "Enter this machine's external IP"
-        read external_ip
-        validate_ip "$external_ip" && break
-    done
-
     touch "/etc/bind/named.conf.script_conf"
 
     grep -q 'include "/etc/bind/named.conf.script_conf";' "/etc/bind/named.conf" || echo "include \"/etc/bind/named.conf.script_conf\";" >> "/etc/bind/named.conf"
 
     echo "" >> "/etc/bind/named.conf.script_conf"
 
-    echo -e "options {\n\tdirectory \"/var/cache/bind\";\n\tallow-transfer { none; };\n\tallow-recursion { none; };\n\tallow-query { any; };\n\tlisten-on { $internal_ip; $external_ip; };\n};" >> "/etc/bind/named.conf.script_conf"
+    echo -e "options {\n\tdirectory \"/var/cache/bind\";\n\tallow-transfer { none; };\n\tallow-recursion { none; };\n\tallow-query { any; };\n\tlisten-on { any; };\n};" >> "/etc/bind/named.conf.script_conf"
     
     chown root:bind "/etc/bind/named.conf.script_conf"
     chmod 644 "/etc/bind/named.conf.script_conf"
@@ -106,16 +82,6 @@ create_zone_file() {
     fi
 
     grep -q 'include "/etc/bind/named.conf.script_zones";' "/etc/bind/named.conf" || echo "include \"/etc/bind/named.conf.script_zones\";" >> "/etc/bind/named.conf"
-
-    while true; do
-        echo "Will the records in this zone file be internally or externally available? (respond 'internal' or 'external')"
-        read internal_external
-        if [[ "$internal_external" == "internal" || "$internal_external" == "external" ]]; then
-            break
-        else
-            echo "Invalid input. Please enter 'internal' or 'external'."
-        fi
-    done
 
     echo "Will this zone file be for forward or reverse lookups? (respond 'forward' or 'reverse') "
     read forward_or_reverse
